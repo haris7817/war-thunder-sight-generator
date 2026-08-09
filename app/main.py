@@ -31,13 +31,18 @@ def _install_exception_hook(app) -> None:
 def main() -> int:
     log.info("Starting %s v%s", APP_NAME, __version__)
 
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
+    from app.infrastructure.filesystem import resource_path
     from app.ui import theme
     from app.ui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
+    icon_path = resource_path("assets", "icon.ico")
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
     theme.apply_theme(app)
     _install_exception_hook(app)
 

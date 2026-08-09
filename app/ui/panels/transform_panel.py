@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QDoubleSpinBox,
     QFormLayout,
     QPushButton,
     QVBoxLayout,
@@ -18,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from app.domain.transform import ArtworkTransform
 from app.ui.widgets.collapsible_section import CollapsibleSection
+from app.ui.widgets.no_scroll import NoScrollDoubleSpinBox
 
 
 class TransformPanel(QWidget):
@@ -57,8 +57,8 @@ class TransformPanel(QWidget):
             spin.valueChanged.connect(self._emit)
 
     @staticmethod
-    def _spin(lo: float, hi: float, step: float, value: float) -> QDoubleSpinBox:
-        s = QDoubleSpinBox()
+    def _spin(lo: float, hi: float, step: float, value: float) -> NoScrollDoubleSpinBox:
+        s = NoScrollDoubleSpinBox()
         s.setRange(lo, hi)
         s.setSingleStep(step)
         s.setDecimals(3)
