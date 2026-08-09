@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 
-from app.domain.geometry import LineSegment, Quad
+from app.domain.geometry import GeometrySource, LineSegment, Point, Quad
 from app.domain.session import SessionState
 from app.domain.settings import ShadingSettings, TraceSettings
 from app.domain.transform import ArtworkTransform
+from app.utils.math_utils import point_segment_distance
 
 
 class SessionStore(QObject):
@@ -24,6 +25,19 @@ class SessionStore(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._state = SessionState()
+        self._undo_state: SessionState | None = None  # single-level undo
+
+    def _push_undo(self) -> None:
+        self._undo_state = self._state
+
+    def can_undo(self) -> bool:
+        return self._undo_state is not None
+
+    def undo(self) -> None:
+        """Restore the state from before the last manual edit (single level)."""
+        if self._undo_state is not None:
+            restored, self._undo_state = self._undo_state, None
+            self._set_state(restored, geometry=True)
 
     @property
     def state(self) -> SessionState:
@@ -56,6 +70,44 @@ class SessionStore(QObject):
         self._set_state(
             self._state.with_lines(lines).with_quads(quads), geometry=True
         )
+
+    def set_traced_lines(self, lines: tuple[LineSegment, ...]) -> None:
+        """Re-trace: replace only AUTO_TRACE lines; keep manual + shading geometry."""
+        self._set_state(
+            self._state.replace_lines_of_source(lines, GeometrySource.AUTO_TRACE),
+            geometry=True,
+        )
+
+    def set_shading(
+        self, quads: tuple[Quad, ...], hatch_lines: tuple[LineSegment, ...] = ()
+    ) -> None:
+        """Replace only AUTO_SHADING geometry (fills + hatch); keep everything else."""
+        state = self._state.replace_quads_of_source(quads, GeometrySource.AUTO_SHADING)
+        state = state.replace_lines_of_source(hatch_lines, GeometrySource.AUTO_SHADING)
+        self._set_state(state, geometry=True)
+
+    # --- manual edits ---------------------------------------------------------
+
+    def add_segment(self, a: Point, b: Point) -> None:
+        """Add a user-drawn (MANUAL) line. Undoable."""
+        self._push_undo()
+        seg = LineSegment(a, b, source=GeometrySource.MANUAL)
+        self._set_state(self._state.with_lines(self._state.lines + (seg,)), geometry=True)
+
+    def erase_near(self, x: float, y: float, radius: float) -> int:
+        """Remove all lines within ``radius`` of (x,y). Returns count removed. Undoable."""
+        to_remove = [
+            ls
+            for ls in self._state.lines
+            if point_segment_distance(x, y, ls.a.x, ls.a.y, ls.b.x, ls.b.y) <= radius
+        ]
+        if not to_remove:
+            return 0
+        self._push_undo()
+        remove_ids = {ls.id for ls in to_remove}
+        kept = tuple(ls for ls in self._state.lines if ls.id not in remove_ids)
+        self._set_state(self._state.with_lines(kept), geometry=True)
+        return len(to_remove)
 
     @property
     def lines(self) -> tuple[LineSegment, ...]:

@@ -17,6 +17,19 @@ def clamp[Number: (int, float)](value: Number, low: Number, high: Number) -> Num
     return value
 
 
+def point_segment_distance(
+    px: float, py: float, ax: float, ay: float, bx: float, by: float
+) -> float:
+    """Shortest distance from point (px,py) to segment (a,b), incl. endpoint cases."""
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        return ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
+    t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)
+    t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    cx, cy = ax + t * dx, ay + t * dy
+    return ((px - cx) ** 2 + (py - cy) ** 2) ** 0.5
+
+
 def make_odd_at_least(value: int, minimum: int = 3) -> int:
     """Return the smallest odd int >= ``value`` and >= ``minimum``.
 
