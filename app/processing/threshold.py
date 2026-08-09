@@ -26,25 +26,27 @@ def _thresh_type(invert: bool) -> int:
     return cv2.THRESH_BINARY if invert else cv2.THRESH_BINARY_INV
 
 
-def should_invert(gray: np.ndarray, border: int = 4) -> bool:
-    """Heuristic: True if the image border is dark (=> light subject on dark bg).
+def should_invert(gray: np.ndarray, border: int = 6, inset_frac: float = 0.03) -> bool:
+    """Heuristic: True if the background is dark (=> light subject on dark bg).
 
-    Samples a ``border``-pixel frame around the edge; if its mean luminance is below
-    mid-gray the background is dark and thresholding should be inverted.
+    Samples a thin band of the image *inset* from each edge, using the **median**
+    luminance. The inset skips a decorative frame (real client art like Remielle has
+    a thin white border around a dark image that would otherwise flip the polarity);
+    the median resists outliers. Below mid-gray => dark background => invert.
     """
     h, w = gray.shape[:2]
-    b = min(border, h, w)
-    if b <= 0:
-        return False
-    frame = np.concatenate(
-        [
-            gray[:b, :].ravel(),
-            gray[-b:, :].ravel(),
-            gray[:, :b].ravel(),
-            gray[:, -b:].ravel(),
-        ]
-    )
-    return float(frame.mean()) < 128.0
+    inset = int(min(h, w) * inset_frac)
+    b = max(1, min(border, (min(h, w) - inset) // 2))
+    if b <= 0 or inset + b >= min(h, w):
+        inset = 0  # too small for an inset; fall back to the outer edge
+    bands = [
+        gray[inset : inset + b, :],
+        gray[h - inset - b : h - inset, :],
+        gray[:, inset : inset + b],
+        gray[:, w - inset - b : w - inset],
+    ]
+    frame = np.concatenate([band.ravel() for band in bands])
+    return float(np.median(frame)) < 128.0
 
 
 def otsu(gray: np.ndarray, *, invert: bool = False) -> np.ndarray:
