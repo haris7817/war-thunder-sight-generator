@@ -12,10 +12,12 @@ from enum import Enum
 
 from app.utils.math_utils import clamp, make_odd_at_least
 
-# Element-count budget (see research: sights can silently fail to load when too
-# large). Warn above WARN, hard-cap at MAX. Both configurable per TraceSettings.
-DEFAULT_WARN_ELEMENTS = 800
-DEFAULT_MAX_ELEMENTS = 3000
+# Element-count budget. The research cited ~800 warn / ~3000 hard ceiling, but the
+# client's own working sights measured 4.5k-7.4k elements (see scripts/analyze_blk.py
+# on the reference sights), so the game tolerates far more. We warn earlier than the
+# cap and cap generously; both are configurable per TraceSettings.
+DEFAULT_WARN_ELEMENTS = 1500
+DEFAULT_MAX_ELEMENTS = 6000
 
 
 class ThresholdMethod(Enum):
@@ -74,11 +76,11 @@ class TraceSettings:
     def from_preset(cls, preset: TracePreset) -> TraceSettings:
         """A preset is just a named TraceSettings instance."""
         if preset is TracePreset.FAST:
-            return cls(detail=30, blur_ksize=3)
+            return cls(detail=45, blur_ksize=3)
         if preset is TracePreset.BALANCED:
-            return cls(detail=60)
+            return cls(detail=68)
         if preset is TracePreset.HIGH:
-            return cls(detail=85)
+            return cls(detail=82)
         raise ValueError(f"unknown preset: {preset!r}")
 
 

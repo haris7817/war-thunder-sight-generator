@@ -59,6 +59,15 @@ def bimodal(size: int = 100, low: int = 40, high: int = 200, split: float = 0.5)
     return np.dstack([gray, gray, gray])
 
 
+def filled_circle(size: int = 300, radius: int | None = None) -> np.ndarray:
+    """Black filled circle on white — a smooth shape that traces to many short
+    segments (unlike straight-edged shapes, whose long edges the chord filter drops)."""
+    img = white_canvas(size, size)
+    r = radius if radius is not None else size // 3
+    cv2.circle(img, (size // 2, size // 2), r, BLACK, -1)
+    return img
+
+
 def light_on_dark(size: int = 200) -> np.ndarray:
     """White filled circle on black background (needs the invert path)."""
     img = np.zeros((size, size, 3), dtype=np.uint8)
