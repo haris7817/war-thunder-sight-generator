@@ -7,7 +7,8 @@ tools here — no rail rewrite.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QButtonGroup, QFrame, QToolButton, QVBoxLayout
 
 from app.ui import theme
@@ -19,7 +20,7 @@ class ToolRail(QFrame):
 
     toolSelected = Signal(object)
 
-    def __init__(self, tools: list[tuple[str, Tool, str]], parent=None) -> None:
+    def __init__(self, tools: list[tuple[QIcon, Tool, str]], parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("rail")
         self.setFixedWidth(theme.RAIL_WIDTH)
@@ -33,9 +34,10 @@ class ToolRail(QFrame):
         self._group.setExclusive(True)
         self._tools: dict[QToolButton, Tool] = {}
 
-        for i, (glyph, tool, tip) in enumerate(tools):
+        for i, (icon, tool, tip) in enumerate(tools):
             btn = QToolButton()
-            btn.setText(glyph)
+            btn.setIcon(icon)
+            btn.setIconSize(QSize(24, 24))
             btn.setCheckable(True)
             btn.setChecked(i == 0)
             btn.setToolTip(tip)

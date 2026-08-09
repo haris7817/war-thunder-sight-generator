@@ -24,6 +24,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QWidget
 
+from app.application.hit_testing import nearest_segment
 from app.blk.coordinate_mapper import CoordinateMapper
 from app.domain.geometry import LineSegment, Point, Quad
 from app.domain.transform import ArtworkTransform
@@ -60,6 +61,8 @@ class Canvas(QWidget):
         self._hash = SpatialHash()
         self._mapper: CoordinateMapper | None = None
         self._artwork = ArtworkTransform.identity()
+        self._preview_line: tuple[Point, Point] | None = None
+        self._highlight_id: int | None = None
 
         self._zoom = 1.0
         self._pan_x = 0.0
@@ -107,7 +110,44 @@ class Canvas(QWidget):
         self.update()
 
     def set_tool(self, tool: Tool) -> None:
+        if self._tool is not None:
+            self._tool.deactivate(self)
         self._tool = tool
+        self._preview_line = None
+        self._highlight_id = None
+        self._apply_tool_cursor()
+        self.update()
+
+    def _apply_tool_cursor(self) -> None:
+        name = getattr(self._tool, "name", "")
+        if name == "draw_line":
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        elif name == "erase":
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:  # select / pan
+            self.setCursor(Qt.CursorShape.OpenHandCursor if self._space_down else Qt.CursorShape.ArrowCursor)
+
+    # --- transient overlays (preview line, erase highlight) --------------------
+
+    def set_preview_line(self, a: Point, b: Point) -> None:
+        self._preview_line = (a, b)
+        self.update()
+
+    def clear_preview_line(self) -> None:
+        self._preview_line = None
+        self.update()
+
+    def set_erase_highlight(self, x: float, y: float, radius: float) -> None:
+        seg = nearest_segment(self._lines, x, y, radius)
+        new_id = seg.id if seg is not None else None
+        if new_id != self._highlight_id:
+            self._highlight_id = new_id
+            self.update()
+
+    def clear_erase_highlight(self) -> None:
+        if self._highlight_id is not None:
+            self._highlight_id = None
+            self.update()
 
     @property
     def zoom_percent(self) -> int:
@@ -174,16 +214,41 @@ class Canvas(QWidget):
                 painter.drawPolygon(poly)
             painter.setBrush(Qt.BrushStyle.NoBrush)
 
+        highlighted = None
         if self._lines:
             pen = QPen(QColor(theme.ACCENT))
             pen.setCosmetic(True)
             pen.setWidthF(1.4)
             painter.setPen(pen)
-            batch = [
-                QLineF(*self._screen_pt(vt, s.a.x, s.a.y), *self._screen_pt(vt, s.b.x, s.b.y))
-                for s in self._lines
-            ]
+            batch = []
+            for s in self._lines:
+                line = QLineF(
+                    *self._screen_pt(vt, s.a.x, s.a.y), *self._screen_pt(vt, s.b.x, s.b.y)
+                )
+                batch.append(line)
+                if s.id == self._highlight_id:
+                    highlighted = line
             painter.drawLines(batch)
+
+        # Erase hover: draw the exact segment that would be deleted, in red.
+        if highlighted is not None:
+            pen = QPen(QColor("#ff5555"))
+            pen.setCosmetic(True)
+            pen.setWidthF(3.0)
+            painter.setPen(pen)
+            painter.drawLine(highlighted)
+
+        # Draw-line preview (dashed).
+        if self._preview_line is not None:
+            a, b = self._preview_line
+            pen = QPen(QColor(theme.TEXT))
+            pen.setCosmetic(True)
+            pen.setWidthF(1.2)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.drawLine(
+                QLineF(*self._screen_pt(vt, a.x, a.y), *self._screen_pt(vt, b.x, b.y))
+            )
 
     def _paint_center_guides(self, painter: QPainter) -> None:
         cx = self.width() / 2.0
@@ -242,6 +307,9 @@ class Canvas(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self.setFocus()
+        if event.button() == Qt.MouseButton.RightButton:
+            self._tool.cancel(self)  # cancel an in-progress draw, etc.
+            return
         if self._wants_pan(event.button()):
             self._panning = True
             self._last_mouse = event.position()
@@ -276,7 +344,15 @@ class Canvas(QWidget):
                 self.setCursor(Qt.CursorShape.OpenHandCursor)
             event.accept()
             return
+        if event.key() == Qt.Key.Key_Escape:
+            self._tool.cancel(self)  # abort in-progress draw
+            event.accept()
+            return
         super().keyPressEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.clear_erase_highlight()
+        super().leaveEvent(event)
 
     def keyReleaseEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
