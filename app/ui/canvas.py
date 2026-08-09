@@ -12,10 +12,21 @@ from __future__ import annotations
 
 import numpy as np
 from PySide6.QtCore import QLineF, QPointF, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPen, QWheelEvent
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPolygonF,
+    QWheelEvent,
+)
 from PySide6.QtWidgets import QWidget
 
+from app.blk.coordinate_mapper import CoordinateMapper
 from app.domain.geometry import LineSegment, Point, Quad
+from app.domain.transform import ArtworkTransform
 from app.ui import theme
 from app.ui.spatial_hash import SpatialHash
 from app.ui.tools.base import Tool, ToolEvent
@@ -47,6 +58,8 @@ class Canvas(QWidget):
         self._lines: tuple[LineSegment, ...] = ()
         self._quads: tuple[Quad, ...] = ()
         self._hash = SpatialHash()
+        self._mapper: CoordinateMapper | None = None
+        self._artwork = ArtworkTransform.identity()
 
         self._zoom = 1.0
         self._pan_x = 0.0
@@ -64,8 +77,24 @@ class Canvas(QWidget):
         else:
             self._image = ndarray_to_qimage(rgb)
             self._img_h, self._img_w = rgb.shape[:2]
+            self._mapper = CoordinateMapper(image_width=self._img_w, image_height=self._img_h)
             self.fit_to_view()
         self.update()
+
+    def set_artwork_transform(self, transform: ArtworkTransform) -> None:
+        self._artwork = transform
+        self.update()
+
+    def _transform_point(self, px: float, py: float) -> tuple[float, float]:
+        """Apply the artwork transform in pixel space, matching the exporter exactly.
+
+        Goes pixel -> sight (with transform) -> pixel, so the on-canvas preview lands
+        where the exported .blk will (both use the same CoordinateMapper + transform).
+        """
+        if self._mapper is None or self._artwork.is_identity:
+            return px, py
+        sx, sy = self._mapper.to_sight_transformed(px, py, self._artwork)
+        return self._mapper.from_sight(sx, sy)
 
     def set_geometry(self, lines: tuple[LineSegment, ...], quads: tuple[Quad, ...] = ()) -> None:
         self._lines = tuple(lines)
@@ -124,14 +153,30 @@ class Canvas(QWidget):
         self._paint_geometry(painter, vt)
         self._paint_center_guides(painter)
 
+    def _screen_pt(self, vt: ViewTransform, px: float, py: float) -> tuple[float, float]:
+        tx, ty = self._transform_point(px, py)
+        return vt.image_to_screen(tx, ty)
+
     def _paint_geometry(self, painter: QPainter, vt: ViewTransform) -> None:
+        if self._quads:
+            painter.setPen(Qt.PenStyle.NoPen)
+            fill = QColor(theme.ACCENT)
+            fill.setAlpha(110)
+            painter.setBrush(QBrush(fill))
+            for q in self._quads:
+                poly = QPolygonF(
+                    [QPointF(*self._screen_pt(vt, p.x, p.y)) for p in q.vertices]
+                )
+                painter.drawPolygon(poly)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
         if self._lines:
             pen = QPen(QColor(theme.ACCENT))
             pen.setCosmetic(True)
             pen.setWidthF(1.4)
             painter.setPen(pen)
             batch = [
-                QLineF(*vt.image_to_screen(s.a.x, s.a.y), *vt.image_to_screen(s.b.x, s.b.y))
+                QLineF(*self._screen_pt(vt, s.a.x, s.a.y), *self._screen_pt(vt, s.b.x, s.b.y))
                 for s in self._lines
             ]
             painter.drawLines(batch)
