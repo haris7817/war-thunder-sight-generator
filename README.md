@@ -9,7 +9,13 @@ tracing work done in the WTDraw web editor and let you fix the rest by hand.
 
 ## Status
 
-Under active development. See milestones in the delivery plan.
+Feature-complete MVP. See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for how to use it and
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues.
+
+## For end users
+
+Unzip the delivered build and run `WarThunderSightGenerator.exe` — no Python required.
+Then follow the [User Guide](docs/USER_GUIDE.md).
 
 ## Requirements
 
@@ -25,6 +31,20 @@ pip install -e .[dev]
 pytest
 python -m app.main
 ```
+
+> On a machine with a global `PYTHONHOME` set to another Python, prefix source commands
+> with `$env:PYTHONHOME=$null; $env:PYTHONNOUSERSITE=1;` (see TROUBLESHOOTING). The
+> packaged `.exe` is unaffected.
+
+## Building the Windows executable
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python scripts/build_windows.py
+```
+
+Produces `dist/WarThunderSightGenerator/` (onedir). Zip that folder for delivery. Build
+config lives in `app.spec` (icon, version, bundled `template.blk`, excluded modules).
 
 ## Project layout
 

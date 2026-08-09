@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QSlider, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+from app.ui.widgets.no_scroll import NoScrollSlider
 
 
 class LabelledSlider(QWidget):
@@ -34,7 +36,7 @@ class LabelledSlider(QWidget):
         header.addWidget(self._value)
         layout.addLayout(header)
 
-        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider = NoScrollSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(minimum, maximum)
         self._slider.setValue(value)
         self._slider.valueChanged.connect(self._on_changed)

@@ -65,9 +65,13 @@ class Canvas(QWidget):
         self._pan_x = 0.0
         self._pan_y = 0.0
         self._panning = False
+        self._space_down = False
         self._last_mouse = QPointF()
 
         self._tool: Tool = SelectTool()
+        # Accept keyboard focus so spacebar-pan works; show a grab cursor.
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     # --- public API ------------------------------------------------------------
 
@@ -226,10 +230,22 @@ class Canvas(QWidget):
             left_button=bool(event.buttons() & Qt.MouseButton.LeftButton),
         )
 
+    def _wants_pan(self, button: Qt.MouseButton) -> bool:
+        """Pan on: middle-drag, spacebar+left-drag, or left-drag with the Select tool."""
+        if button == Qt.MouseButton.MiddleButton:
+            return True
+        if button == Qt.MouseButton.LeftButton and (
+            self._space_down or self._tool.name == "select"
+        ):
+            return True
+        return False
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.MiddleButton:
+        self.setFocus()
+        if self._wants_pan(event.button()):
             self._panning = True
             self._last_mouse = event.position()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
             return
         self._tool.on_press(self, self._tool_event(event))
 
@@ -245,7 +261,28 @@ class Canvas(QWidget):
         self._tool.on_move(self, self._tool_event(event))
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.MiddleButton:
+        if self._panning:
             self._panning = False
+            self.setCursor(
+                Qt.CursorShape.OpenHandCursor if self._space_down else Qt.CursorShape.ArrowCursor
+            )
             return
         self._tool.on_release(self, self._tool_event(event))
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
+            self._space_down = True
+            if not self._panning:
+                self.setCursor(Qt.CursorShape.OpenHandCursor)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
+            self._space_down = False
+            if not self._panning:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().keyReleaseEvent(event)
