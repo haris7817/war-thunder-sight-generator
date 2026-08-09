@@ -1,14 +1,16 @@
-"""SHADING panel: Intensity slider with an On/Off badge (driven by intensity > 0)."""
+"""SHADING panel: an On/Off pill in the header + Intensity slider and hatch toggle."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QCheckBox, QPushButton, QVBoxLayout, QWidget
 
 from app.domain.settings import ShadingSettings
-from app.ui import theme
+from app.ui.panel_icons import shading_icon
 from app.ui.widgets.collapsible_section import CollapsibleSection
 from app.ui.widgets.labelled_slider import LabelledSlider
+
+DEFAULT_ON_INTENSITY = 50
 
 
 class ShadingPanel(QWidget):
@@ -19,17 +21,13 @@ class ShadingPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        section = CollapsibleSection("SHADING")
+        section = CollapsibleSection("Shading", shading_icon())
 
-        badge_row = QHBoxLayout()
-        badge_row.addWidget(QLabel("Fills + hatch"))
-        badge_row.addStretch(1)
-        self._badge = QLabel("OFF")
-        self._badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge_row.addWidget(self._badge)
-        holder = QWidget()
-        holder.setLayout(badge_row)
-        section.add_widget(holder)
+        self._pill = QPushButton("OFF")
+        self._pill.setObjectName("pill")
+        self._pill.setCursor(self._pill.cursor())
+        self._pill.clicked.connect(self._toggle_pill)
+        section.set_header_widget(self._pill)
 
         self._intensity = LabelledSlider("Intensity", 0, 100, 0)
         self._intensity.valueChanged.connect(self._on_intensity)
@@ -41,19 +39,22 @@ class ShadingPanel(QWidget):
         section.add_widget(self._hatch)
 
         layout.addWidget(section)
-        self._update_badge(0)
+        self._refresh_pill()
 
-    def _on_intensity(self, value: int) -> None:
-        self._update_badge(value)
+    def _toggle_pill(self) -> None:
+        # Turning on restores a sensible default intensity; off zeroes it.
+        self._intensity.setValue(0 if self._intensity.value() > 0 else DEFAULT_ON_INTENSITY)
+
+    def _on_intensity(self, _value: int) -> None:
+        self._refresh_pill()
         self.changed.emit()
 
-    def _update_badge(self, value: int) -> None:
-        on = value > 0
-        self._badge.setText("ON" if on else "OFF")
-        color = theme.ACCENT if on else theme.TEXT_MUTED
-        self._badge.setStyleSheet(
-            f"color: #0b0d10; background-color: {color}; border-radius: 8px; padding: 1px 8px;"
-        )
+    def _refresh_pill(self) -> None:
+        on = self._intensity.value() > 0
+        self._pill.setText("ON" if on else "OFF")
+        self._pill.setProperty("on", "true" if on else "false")
+        self._pill.style().unpolish(self._pill)
+        self._pill.style().polish(self._pill)
 
     def settings(self) -> ShadingSettings:
         return ShadingSettings(intensity=self._intensity.value(), hatch=self._hatch.isChecked())
