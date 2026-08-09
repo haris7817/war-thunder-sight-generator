@@ -34,21 +34,54 @@ def test_add_segment_is_manual_and_undoable(qtbot):
     assert len(store.lines) == 0
 
 
-def test_erase_removes_nearby_and_undo_restores(qtbot):
+def test_erase_removes_nearest_and_undo_restores(qtbot):
     store = SessionStore()
     store.set_geometry((LineSegment(Point(0, 0), Point(10, 0)),), ())
-    removed = store.erase_near(5, 0, 2.0)  # on the line
-    assert removed == 1
+    assert store.erase_nearest(5, 0, 2.0) is True  # on the line
     assert len(store.lines) == 0
     store.undo()
     assert len(store.lines) == 1
 
 
-def test_erase_miss_returns_zero(qtbot):
+def test_erase_miss_returns_false(qtbot):
     store = SessionStore()
     store.set_geometry((LineSegment(Point(0, 0), Point(10, 0)),), ())
-    assert store.erase_near(5, 100, 2.0) == 0
+    assert store.erase_nearest(5, 100, 2.0) is False
     assert len(store.lines) == 1
+
+
+def test_erase_removes_only_one_segment_of_a_contour(qtbot):
+    # Three connected segments; clicking near one removes ONLY that one.
+    store = SessionStore()
+    a = LineSegment(Point(0, 0), Point(10, 0))
+    b = LineSegment(Point(10, 0), Point(20, 0))
+    c = LineSegment(Point(20, 0), Point(30, 0))
+    store.set_geometry((a, b, c), ())
+    assert store.erase_nearest(15, 0, 2.0) is True  # nearest is segment b
+    remaining_ids = {ls.id for ls in store.lines}
+    assert remaining_ids == {a.id, c.id}
+
+
+def test_erase_drag_stroke_is_single_undo(qtbot):
+    store = SessionStore()
+    a = LineSegment(Point(0, 0), Point(10, 0))
+    b = LineSegment(Point(20, 0), Point(30, 0))
+    store.set_geometry((a, b), ())
+    store.erase_nearest(5, 0, 2.0, record_undo=True)  # stroke start
+    store.erase_nearest(25, 0, 2.0, record_undo=False)  # same stroke
+    assert len(store.lines) == 0
+    store.undo()  # one undo reverts the whole stroke
+    assert len(store.lines) == 2
+
+
+def test_nearest_segment_picks_closest():
+    from app.application.hit_testing import nearest_segment
+
+    near = LineSegment(Point(0, 0), Point(10, 0))
+    far = LineSegment(Point(0, 50), Point(10, 50))
+    got = nearest_segment((near, far), 5, 1, radius=5)
+    assert got is near
+    assert nearest_segment((near, far), 5, 100, radius=5) is None
 
 
 # --- re-trace / shading invariants --------------------------------------------
@@ -74,6 +107,26 @@ def test_retrace_replaces_only_auto_trace(qtbot):
     )
     assert old_auto not in store.lines
     assert len(store.lines) == 1
+
+
+def test_manual_line_exports_and_erased_line_does_not(qtbot):
+    from app.application.export_service import build_export
+    from app.blk.coordinate_mapper import CoordinateMapper
+    from app.domain.transform import ArtworkTransform
+
+    store = SessionStore()
+    store.set_source("x", (200, 200))
+    store.add_segment(Point(50, 50), Point(150, 150))
+    mapper = CoordinateMapper(200, 200)
+
+    exported = build_export(list(store.lines), [], mapper, ArtworkTransform.identity())
+    assert exported.line_count == 1
+    assert "line {line:p4=" in exported.text
+
+    store.erase_nearest(100, 100, 5.0)  # erase the drawn line
+    after = build_export(list(store.lines), [], mapper, ArtworkTransform.identity())
+    assert after.line_count == 0
+    assert "line {line:p4=" not in after.text
 
 
 def test_set_shading_replaces_only_shading(qtbot):

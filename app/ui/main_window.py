@@ -13,7 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -48,6 +48,7 @@ from app.ui.panels.shading_panel import ShadingPanel
 from app.ui.panels.source_panel import SourcePanel
 from app.ui.panels.trace_panel import TracePanel
 from app.ui.panels.transform_panel import TransformPanel
+from app.ui.tool_icons import draw_icon, erase_icon, select_icon
 from app.ui.toolbar import ToolRail
 from app.ui.tools.draw_line_tool import DrawLineTool
 from app.ui.tools.erase_tool import EraseTool
@@ -73,7 +74,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(f"{APP_NAME}  v{__version__}")
-        self.resize(1240, 780)
+        self._size_to_screen()
 
         self._rgb: np.ndarray | None = None
         self._store = SessionStore(self)
@@ -86,9 +87,17 @@ class MainWindow(QMainWindow):
 
         self._rail = ToolRail(
             [
-                ("▶", SelectTool(), "Select"),
-                ("✎", DrawLineTool(self._on_draw_segment), "Draw line"),
-                ("⌫", EraseTool(self._on_erase), "Erase"),
+                (select_icon(), SelectTool(), "Select / Pan — drag to move the view"),
+                (
+                    draw_icon(),
+                    DrawLineTool(self._on_draw_segment),
+                    "Draw line — drag to draw a segment (Esc / right-click cancels)",
+                ),
+                (
+                    erase_icon(),
+                    EraseTool(self._on_erase),
+                    "Erase — click a line to delete just that segment",
+                ),
             ]
         )
         self._canvas = Canvas()
@@ -111,6 +120,22 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     # --- construction ----------------------------------------------------------
+
+    def _size_to_screen(self) -> None:
+        """Fit the window within the available screen and centre it.
+
+        The default was taller than some laptop screens (e.g. 768px), which pushed the
+        pinned Export footer off the bottom. This guarantees it stays on-screen.
+        """
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(1200, 740)
+            return
+        avail = screen.availableGeometry()
+        w = min(1240, avail.width() - 60)
+        h = min(760, avail.height() - 60)
+        self.resize(w, h)
+        self.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
 
     def _build_panel(self) -> QFrame:
         panel = QFrame()
@@ -277,8 +302,8 @@ class MainWindow(QMainWindow):
     def _on_draw_segment(self, a: Point, b: Point) -> None:
         self._store.add_segment(a, b)
 
-    def _on_erase(self, x: float, y: float, radius: float) -> None:
-        self._store.erase_near(x, y, radius)
+    def _on_erase(self, x: float, y: float, radius: float, record_undo: bool) -> None:
+        self._store.erase_nearest(x, y, radius, record_undo=record_undo)
 
     # --- export ----------------------------------------------------------------
 

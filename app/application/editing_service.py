@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 
+from app.application.hit_testing import nearest_segment
 from app.domain.geometry import GeometrySource, LineSegment, Point, Quad
 from app.domain.session import SessionState
 from app.domain.settings import ShadingSettings, TraceSettings
 from app.domain.transform import ArtworkTransform
-from app.utils.math_utils import point_segment_distance
 
 
 class SessionStore(QObject):
@@ -94,20 +94,21 @@ class SessionStore(QObject):
         seg = LineSegment(a, b, source=GeometrySource.MANUAL)
         self._set_state(self._state.with_lines(self._state.lines + (seg,)), geometry=True)
 
-    def erase_near(self, x: float, y: float, radius: float) -> int:
-        """Remove all lines within ``radius`` of (x,y). Returns count removed. Undoable."""
-        to_remove = [
-            ls
-            for ls in self._state.lines
-            if point_segment_distance(x, y, ls.a.x, ls.a.y, ls.b.x, ls.b.y) <= radius
-        ]
-        if not to_remove:
-            return 0
-        self._push_undo()
-        remove_ids = {ls.id for ls in to_remove}
-        kept = tuple(ls for ls in self._state.lines if ls.id not in remove_ids)
+    def erase_nearest(self, x: float, y: float, radius: float, *, record_undo: bool = True) -> bool:
+        """Remove the single nearest line within ``radius`` of (x,y). Returns whether one
+        was removed. Shading quads are never touched.
+
+        ``record_undo`` is True on the first erase of a stroke (mouse-down) and False for
+        subsequent drag erases, so undoing reverts the whole erase stroke at once.
+        """
+        seg = nearest_segment(self._state.lines, x, y, radius)
+        if seg is None:
+            return False
+        if record_undo:
+            self._push_undo()
+        kept = tuple(ls for ls in self._state.lines if ls.id != seg.id)
         self._set_state(self._state.with_lines(kept), geometry=True)
-        return len(to_remove)
+        return True
 
     @property
     def lines(self) -> tuple[LineSegment, ...]:

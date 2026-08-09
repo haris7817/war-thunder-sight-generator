@@ -36,3 +36,9 @@ class Tool:
 
     def on_release(self, canvas, event: ToolEvent) -> None:
         """Mouse release."""
+
+    def cancel(self, canvas) -> None:
+        """Abort any in-progress action (Esc / right-click)."""
+
+    def deactivate(self, canvas) -> None:
+        """Called when switching away from this tool; clear any transient canvas state."""
