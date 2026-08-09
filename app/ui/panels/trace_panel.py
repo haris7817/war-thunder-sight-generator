@@ -1,15 +1,13 @@
-"""TRACE panel: preset chips, Detail slider, and a Re-trace button.
-
-The Re-trace button doubles as a cancel affordance while a trace is running.
-Selecting a preset snaps the Detail slider to that preset's detail.
-"""
+"""TRACE panel: quality preset, Detail slider, and a Re-trace button."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSize, Signal
 from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from app.domain.settings import TracePreset, TraceSettings
+from app.ui.panel_icons import refresh_icon, tracing_icon
+from app.ui.panels.source_panel import field_label
 from app.ui.widgets.chip_group import ChipGroup
 from app.ui.widgets.collapsible_section import CollapsibleSection
 from app.ui.widgets.labelled_slider import LabelledSlider
@@ -25,21 +23,25 @@ class TracePanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        section = CollapsibleSection("TRACE")
+        section = CollapsibleSection("Tracing", tracing_icon())
 
+        section.add_widget(field_label("Quality preset"))
         self._preset = ChipGroup([("fast", "Fast"), ("balanced", "Balanced"), ("high", "High")])
         self._preset.selectionChanged.connect(self._on_preset)
         section.add_widget(self._preset)
 
-        self._detail = LabelledSlider("Detail", 0, 100, TraceSettings.from_preset(TracePreset.BALANCED).detail)
+        self._detail = LabelledSlider(
+            "Detail", 0, 100, TraceSettings.from_preset(TracePreset.BALANCED).detail
+        )
         section.add_widget(self._detail)
 
         self._button = QPushButton("Re-trace")
-        self._button.setObjectName("accent")
+        self._button.setIcon(refresh_icon())
+        self._button.setIconSize(QSize(18, 18))
+        self._button.setMinimumHeight(38)
         self._button.clicked.connect(self._on_button)
         section.add_widget(self._button)
 
-        # Preselect Balanced so the panel matches the default detail.
         for btn in self._preset.findChildren(QPushButton):
             if btn.text() == "Balanced":
                 btn.setChecked(True)

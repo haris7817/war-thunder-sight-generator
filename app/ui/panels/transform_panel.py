@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.domain.transform import ArtworkTransform
+from app.ui.panel_icons import transform_icon
 from app.ui.widgets.collapsible_section import CollapsibleSection
 from app.ui.widgets.no_scroll import NoScrollDoubleSpinBox
 
@@ -28,7 +29,7 @@ class TransformPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        section = CollapsibleSection("TRANSFORM")
+        section = CollapsibleSection("Transform", transform_icon())
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
         form.setSpacing(8)
