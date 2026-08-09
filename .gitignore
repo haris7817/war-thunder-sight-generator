@@ -1,0 +1,31 @@
+# --- Client artwork & deliverables (never commit) ---
+client_samples/**
+!client_samples/README.md
+artifacts/
+logs/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Packaging ---
+dist/
+build/
+*.spec.bak
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

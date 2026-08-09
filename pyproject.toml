@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "war-thunder-sight-generator"
+version = "0.1.0"
+description = "Import artwork, auto-trace it to vector geometry, and export a valid War Thunder custom sight (.blk)."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "Proprietary" }
+authors = [{ name = "haris7817" }]
+dependencies = [
+    "PySide6>=6.7,<6.9",
+    "opencv-python>=4.9,<5.0",
+    "numpy>=1.26,<3.0",
+    "Pillow>=10.2,<12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+    "ruff>=0.6",
+    "black>=24.0",
+    "pyinstaller>=6.6",
+]
+
+[project.scripts]
+wtsight = "app.main:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+# pythonpath lets tests import `app` and `tests` without an editable install.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = ["E501"]  # line length handled by black/formatter
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]

@@ -1,0 +1,13 @@
+# War Thunder sight files must keep LF endings — the game parser is picky and
+# CRLF can corrupt the strict BLK format. Treat template/golden .blk as text/LF.
+*.blk text eol=lf
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
