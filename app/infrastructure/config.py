@@ -23,3 +23,18 @@ USER_SIGHTS_HINT = (
     r"Documents\My Games\WarThunder\Saves\<user ID>\production\UserSights"
     r"\<vehicle_id or all_tanks>\sight_1.blk"
 )
+
+
+def _qsettings():
+    """A QSettings scoped to this app (Qt imported lazily so headless code is unaffected)."""
+    from PySide6.QtCore import QSettings
+
+    return QSettings(QSETTINGS_ORG, QSETTINGS_APP)
+
+
+def get_setting(key: str, default: str = "") -> str:
+    return str(_qsettings().value(key, default))
+
+
+def set_setting(key: str, value: str) -> None:
+    _qsettings().setValue(key, value)

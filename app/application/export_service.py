@@ -145,6 +145,31 @@ def write_sight_file(path: str | Path, text: str) -> Path:
     return p
 
 
+def export_to_file(
+    segments_px: list[LineSegment],
+    quads_px: list[Quad],
+    mapper: CoordinateMapper,
+    transform: ArtworkTransform,
+    out_path: str | Path,
+    template: SightTemplate | None = None,
+    *,
+    warn_elements: int = DEFAULT_WARN_ELEMENTS,
+    max_elements: int = DEFAULT_MAX_ELEMENTS,
+) -> tuple[ExportResult, Path]:
+    """Map pixel geometry, render, and write the .blk atomically. Runs off-thread."""
+    result = build_export(
+        segments_px,
+        quads_px,
+        mapper,
+        transform,
+        template,
+        warn_elements=warn_elements,
+        max_elements=max_elements,
+    )
+    path = write_sight_file(out_path, result.text)
+    return result, path
+
+
 def render_and_write_sight(
     segments_sight: list[LineSegment],
     quads_sight: list[Quad],
