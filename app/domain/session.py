@@ -59,6 +59,19 @@ class SessionState:
             quads=kept_quads + new_auto_quads,
         )
 
+    def replace_lines_of_source(
+        self, new_lines: tuple[LineSegment, ...], source: GeometrySource
+    ) -> SessionState:
+        """Replace only lines of ``source`` (e.g. re-trace swaps AUTO_TRACE, keeps rest)."""
+        kept = tuple(ls for ls in self.lines if ls.source is not source)
+        return replace(self, lines=kept + tuple(new_lines))
+
+    def replace_quads_of_source(
+        self, new_quads: tuple[Quad, ...], source: GeometrySource
+    ) -> SessionState:
+        kept = tuple(q for q in self.quads if q.source is not source)
+        return replace(self, quads=kept + tuple(new_quads))
+
     def manual_geometry_count(self) -> int:
         manual_sources = (GeometrySource.MANUAL, GeometrySource.MANUAL_FILL)
         n = sum(1 for ls in self.lines if ls.source in manual_sources)
