@@ -195,7 +195,7 @@ class Canvas(QWidget):
             painter.drawImage(target, self._image)
 
         self._paint_geometry(painter, vt)
-        self._paint_center_guides(painter)
+        self._paint_center_guides(painter, vt)
 
     def _screen_pt(self, vt: ViewTransform, px: float, py: float) -> tuple[float, float]:
         tx, ty = self._transform_point(px, py)
@@ -250,15 +250,31 @@ class Canvas(QWidget):
                 QLineF(*self._screen_pt(vt, a.x, a.y), *self._screen_pt(vt, b.x, b.y))
             )
 
-    def _paint_center_guides(self, painter: QPainter) -> None:
-        cx = self.width() / 2.0
-        cy = self.height() / 2.0
+    def aim_point_screen_pos(self) -> tuple[float, float]:
+        """Screen position of the sight's aim point (origin).
+
+        The origin lives at the image centre, so the guides must FOLLOW the image
+        when the view is panned/zoomed — otherwise dragging the view makes the
+        guides misrepresent where the origin actually is (client-reported bug).
+        Falls back to the widget centre when no image is loaded.
+        """
+        if self._image is not None and self._img_w and self._img_h:
+            return self.view_transform().image_to_screen(self._img_w / 2.0, self._img_h / 2.0)
+        return self.width() / 2.0, self.height() / 2.0
+
+    def _paint_center_guides(self, painter: QPainter, vt: ViewTransform) -> None:
+        if self._image is not None and self._img_w and self._img_h:
+            cx, cy = vt.image_to_screen(self._img_w / 2.0, self._img_h / 2.0)
+        else:
+            cx, cy = self.width() / 2.0, self.height() / 2.0
         pen = QPen(QColor(theme.TEXT_MUTED))
         pen.setCosmetic(True)
         pen.setWidth(1)
         painter.setPen(pen)
         painter.drawLine(QPointF(cx, 0), QPointF(cx, self.height()))
         painter.drawLine(QPointF(0, cy), QPointF(self.width(), cy))
+        # Small ring at the exact origin so the aim point is unambiguous.
+        painter.drawEllipse(QPointF(cx, cy), 6.0, 6.0)
 
     @staticmethod
     def _qrectf(tl: tuple[float, float], br: tuple[float, float]):

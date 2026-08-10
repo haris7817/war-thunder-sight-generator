@@ -339,7 +339,14 @@ class MainWindow(QMainWindow):
         result, path = payload
         box = QMessageBox(self)
         box.setWindowTitle("Exported")
-        box.setText(f"Saved {result.element_count} elements to:\n{path}")
+        text = f"Saved {result.element_count} elements to:\n{path}"
+        if result.truncated:
+            text += (
+                "\n\nNote: the trace was very dense, so some auto-traced lines were "
+                "dropped to fit the game's element limit. All your manual drawings "
+                "and shading fills are kept. Lower Detail to reduce density."
+            )
+        box.setText(text)
         open_btn = box.addButton("Open folder", QMessageBox.ButtonRole.ActionRole)
         box.addButton(QMessageBox.StandardButton.Ok)
         box.exec()

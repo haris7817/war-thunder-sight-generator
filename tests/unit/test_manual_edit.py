@@ -129,6 +129,62 @@ def test_manual_line_exports_and_erased_line_does_not(qtbot):
     assert "line {line:p4=" not in after.text
 
 
+def test_export_truncation_never_drops_manual_lines(qtbot):
+    # Client-reported bug: manual lines sit AFTER the dense auto-trace in the list,
+    # so first-N truncation silently dropped the user's hand-drawn work.
+    from app.application.export_service import build_export
+    from app.blk.coordinate_mapper import CoordinateMapper
+    from app.domain.transform import ArtworkTransform
+
+    auto = [
+        LineSegment(Point(i, 0), Point(i + 1, 0), source=GeometrySource.AUTO_TRACE)
+        for i in range(10)
+    ]
+    manual = [
+        LineSegment(Point(77, 77), Point(88, 88), source=GeometrySource.MANUAL),
+        LineSegment(Point(99, 99), Point(111, 111), source=GeometrySource.MANUAL),
+    ]
+    segments = auto + manual  # manual at the tail, like the real SessionStore
+    mapper = CoordinateMapper(200, 200)
+
+    result = build_export(
+        segments, [], mapper, ArtworkTransform.identity(), warn_elements=1, max_elements=5
+    )
+    assert result.truncated is True
+    assert result.line_count == 5
+    # Both manual lines survive; the distinctive manual coordinates are in the text.
+    sx, sy = mapper.to_sight(77, 77)
+    assert f"{sx:.6f},{sy:.6f}" in result.text
+    sx, sy = mapper.to_sight(99, 99)
+    assert f"{sx:.6f},{sy:.6f}" in result.text
+
+
+def test_export_truncation_keeps_manual_fill_quads(qtbot):
+    from app.application.export_service import build_export
+    from app.blk.coordinate_mapper import CoordinateMapper
+    from app.domain.transform import ArtworkTransform
+
+    auto_quads = [
+        Quad(
+            Point(i, 0), Point(i + 1, 0), Point(i + 1, 1), Point(i, 1),
+            source=GeometrySource.AUTO_SHADING,
+        )
+        for i in range(6)
+    ]
+    manual_quad = Quad(
+        Point(50, 50), Point(60, 50), Point(60, 60), Point(50, 60),
+        source=GeometrySource.MANUAL_FILL,
+    )
+    mapper = CoordinateMapper(200, 200)
+    result = build_export(
+        [], auto_quads + [manual_quad], mapper, ArtworkTransform.identity(),
+        warn_elements=1, max_elements=3,
+    )
+    assert result.truncated is True
+    sx, sy = mapper.to_sight(50, 50)
+    assert f"{sx:.6f},{sy:.6f}" in result.text  # the manual fill survives
+
+
 def test_set_shading_replaces_only_shading(qtbot):
     store = SessionStore()
     store.set_traced_lines(

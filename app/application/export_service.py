@@ -67,8 +67,11 @@ def _enforce_budget(
 ) -> tuple[list[LineSegment], list[Quad], bool, list[str]]:
     """Warn above ``warn_elements``; hard-cap total at ``max_elements``.
 
-    Lines are kept first, then quads fill the remaining budget. Truncation is
-    logged, never silent (per the research on silent sight-load failure).
+    Truncation priority: **user-authored geometry is never dropped in favour of
+    auto-generated geometry**. Manual lines/fills are kept first, then auto lines,
+    then auto quads fill the remaining budget. (Client-reported bug: manual lines
+    are appended after a dense auto-trace, so naive first-N truncation silently
+    dropped exactly the user's hand-drawn work.) Truncation is logged, never silent.
     """
     warnings: list[str] = []
     total = len(segments) + len(quads)
@@ -80,12 +83,26 @@ def _enforce_budget(
     if total <= max_elements:
         return segments, quads, False, warnings
 
-    kept_lines = segments[:max_elements]
-    remaining = max_elements - len(kept_lines)
-    kept_quads = quads[: max(0, remaining)]
+    manual_lines = [s for s in segments if not s.source.is_auto]
+    auto_lines = [s for s in segments if s.source.is_auto]
+    manual_quads = [q for q in quads if not q.source.is_auto]
+    auto_quads = [q for q in quads if q.source.is_auto]
+
+    budget = max_elements
+    kept_manual_lines = manual_lines[:budget]
+    budget -= len(kept_manual_lines)
+    kept_manual_quads = manual_quads[:budget]
+    budget -= len(kept_manual_quads)
+    kept_auto_lines = auto_lines[:budget]
+    budget -= len(kept_auto_lines)
+    kept_auto_quads = auto_quads[:budget]
+
+    kept_lines = kept_manual_lines + kept_auto_lines
+    kept_quads = kept_manual_quads + kept_auto_quads
     msg = (
         f"element count {total} exceeds hard cap {max_elements}; "
-        f"truncated to {len(kept_lines)} lines + {len(kept_quads)} quads"
+        f"kept all {len(kept_manual_lines) + len(kept_manual_quads)} manual elements, "
+        f"truncated auto geometry to {len(kept_auto_lines)} lines + {len(kept_auto_quads)} quads"
     )
     warnings.append(msg)
     log.warning(msg)
