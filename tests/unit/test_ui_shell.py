@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from app.infrastructure.config import APP_NAME
 from app.ui import theme
 from app.ui.canvas import Canvas
@@ -49,6 +50,28 @@ def test_canvas_center_guides_do_not_crash_on_paint(qtbot):
     c.resize(400, 300)
     c.set_image(synthetic.crosshair(100))
     c.grab()  # forces a paintEvent offscreen
+
+
+def test_aim_point_guides_follow_image_when_panning(qtbot):
+    # Client-reported: guides must move WITH the image during a pan, since they
+    # mark the sight origin (image centre), not the widget centre.
+    c = Canvas()
+    qtbot.addWidget(c)
+    c.resize(400, 300)
+    c.set_image(synthetic.crosshair(100))
+    before = c.aim_point_screen_pos()
+    c._pan_x += 37.0
+    c._pan_y -= 21.0
+    after = c.aim_point_screen_pos()
+    assert after[0] - before[0] == pytest.approx(37.0)
+    assert after[1] - before[1] == pytest.approx(-21.0)
+
+
+def test_aim_point_defaults_to_widget_centre_without_image(qtbot):
+    c = Canvas()
+    qtbot.addWidget(c)
+    c.resize(400, 300)
+    assert c.aim_point_screen_pos() == (200.0, 150.0)
 
 
 def test_source_panel_defaults(qtbot):
